@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Tareas Interactivo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals with Priority Accents (Red, Orange, Yellow, Blue, Gray) -->
+    <!-- Application Structure Plan: A dashboard-style SPA featuring KPIs, interactive charts, and a filterable task board. This structure was chosen to provide an immediate, high-level overview of the project's status while allowing users to drill down into specific task categories (by priority or status) for actionable insights. It transforms a static list into a dynamic project management tool. -->
+    <!-- Visualization & Content Choices: 1. KPIs (Totals): Goal=Inform, Method=HTML/CSS Cards, Interaction=Dynamic update on filter, Justification=Quick summary. 2. Priority Distribution: Goal=Compare Proportions, Method=Chart.js Donut Chart, Interaction=Filterable, Tooltips, Justification=Shows composition of workload. 3. Task Type Distribution: Goal=Compare Categories, Method=Chart.js Bar Chart, Interaction=Filterable, Tooltips, Justification=Shows where effort is focused (bugs vs features). 4. Task List: Goal=Organize/Inform, Method=Filterable HTML Cards, Interaction=Dropdown filters, Justification=Core interactive element for task management. 5. External Note Link: Goal=Collaboration, Method=Dynamic URL parameter, Interaction=Click to external sheet, Justification=Centralizes collaborative notes outside the SPA using the task ID. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 350px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Panel de Control de Tareas y Correcciones</h1>
+            <p class="text-gray-600 mt-2">Un resumen interactivo del estado actual del proyecto.</p>
+        </header>
+
+        <main>
+            <section id="kpis" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+                <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 flex flex-col items-center justify-center">
+                    <h2 class="text-lg font-semibold text-gray-500">Tareas Totales</h2>
+                    <p id="total-tasks" class="text-4xl font-bold text-blue-600 mt-2">0</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 flex flex-col items-center justify-center">
+                    <h2 class="text-lg font-semibold text-gray-500">Críticas</h2>
+                    <p id="critical-tasks" class="text-4xl font-bold text-red-600 mt-2">0</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 flex flex-col items-center justify-center">
+                    <h2 class="text-lg font-semibold text-gray-500">En Desarrollo</h2>
+                    <p id="developing-tasks" class="text-4xl font-bold text-yellow-500 mt-2">0</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 flex flex-col items-center justify-center">
+                    <h2 class="text-lg font-semibold text-gray-500">Pendientes</h2>
+                    <p id="pending-tasks" class="text-4xl font-bold text-gray-600 mt-2">0</p>
+                </div>
+            </section>
+
+            <section class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
+                    <h3 class="text-xl font-bold text-center mb-4">Distribución por Prioridad</h3>
+                    <div class="chart-container">
+                        <canvas id="priorityChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
+                    <h3 class="text-xl font-bold text-center mb-4">Distribución por Tipo</h3>
+                     <div class="chart-container">
+                        <canvas id="typeChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
+                <h3 class="text-2xl font-bold mb-6">Listado de Tareas</h3>
+                <div class="flex flex-wrap gap-4 mb-6">
+                    <div>
+                        <label for="priority-filter" class="block text-sm font-medium text-gray-700">Filtrar por Prioridad</label>
+                        <select id="priority-filter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                            <option value="all">Todas</option>
+                            <option value="CRÍTICA">Crítica</option>
+                            <option value="ALTA">Alta</option>
+                            <option value="MEDIA">Media</option>
+                            <option value="BAJA">Baja</option>
+                            <option value="PENDIENTE">Pendiente</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="status-filter" class="block text-sm font-medium text-gray-700">Filtrar por Estado</label>
+                        <select id="status-filter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                            <option value="all">Todos</option>
+                            <option value="Por Hacer">Por Hacer</option>
+                            <option value="En Desarrollo">En Desarrollo</option>
+                            <option value="Pendiente">Pendiente</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="task-list" class="space-y-4">
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const tasks = [
+                { id: 'C&P (Global)', title: 'Perfil Wizard no finaliza', detail: 'El wizard del perfil nunca termina de ejecutar bien el último paso, volviendo a mostrarse al entrar, impidiendo el uso a nuevos usuarios. Además, vuelve a pedir el email.', priority: 'CRÍTICA', status: 'Por Hacer', type: 'Bug' },
+                { id: 'E3 (Bug)', title: 'Cargar viajes falla (Error 500)', detail: 'La funcionalidad de cargar viajes está fallando con un error 500.', priority: 'CRÍTICA', status: 'Por Hacer', type: 'Bug' },
+                { id: 'C&P (E2)', title: 'Admin: Gestión de Usuarios', detail: 'La sección de administración de usuarios para los admins no permite crear, modificar y eliminar usuarios (necesario para moderar y suspender/eliminar bots).', priority: 'ALTA', status: 'Por Hacer', type: 'Mejora' },
+                { id: 'E3 (Missing)', title: 'Falta Alta de Conductor', detail: 'No se encuentra la feature de poder darse de alta como conductor, incluyendo la subida de una imagen requerida (DNI, foto auto, etc.).', priority: 'ALTA', status: 'Por Hacer', type: 'Feature' },
+                { id: 'E3 (Bug)', title: 'Filtros de Viajes no funcionan', detail: 'Los filtros no funcionan en la lista de viajes; siempre se muestran los mismos viajes.', priority: 'ALTA', status: 'Por Hacer', type: 'Bug' },
+                { id: 'E3 (Bug)', title: 'Detalle de Viajes Hardcodeado', detail: 'Al clickear los viajes, todos abren la misma ventana de detalles hardcodeados.', priority: 'ALTA', status: 'Por Hacer', type: 'Bug' },
+                { id: 'E4 (Feature)', title: 'Flujo completo de solicitar unirse a un viaje', detail: 'Implementar el flujo de solicitud, aceptación y rechazo.', priority: 'ALTA', status: 'En Desarrollo', type: 'Feature' },
+                { id: 'E4 (Feature)', title: 'Notificaciones de solicitud y aceptación/rechazo por mail', detail: 'Implementar las notificaciones por correo electrónico.', priority: 'ALTA', status: 'En Desarrollo', type: 'Feature' },
+                { id: 'E4 (Feature)', title: 'Flujo de marcar un viaje como finalizado', detail: 'Implementar la funcionalidad de finalización del viaje.', priority: 'ALTA', status: 'En Desarrollo', type: 'Feature' },
+                { id: 'C&P (E3)', title: 'Botón \'Mis Viajes\' no funciona', detail: 'Hay un segundo botón en la sección "Mis Viajes" para publicar viajes que no funciona.', priority: 'MEDIA', status: 'Por Hacer', type: 'Bug' },
+                { id: 'E4 (Feature)', title: 'Foto de Viaje Editable', detail: 'Foto guardada por viaje, tomando por default la del auto del usuario, pero pudiendo subir otra.', priority: 'MEDIA', status: 'En Desarrollo', type: 'Feature' },
+                { id: 'Comentario', title: 'Redirect de Social Login', detail: 'Al loguearse con redes sociales, el redirect no lleva a la página que uno estaba intentando acceder (el bug no ocurre con mail/password).', priority: 'MEDIA', status: 'Por Hacer', type: 'Mejora' },
+                { id: 'E3 (Feature)', title: 'Poder cargar viajes', detail: 'Carga de viajes (asumiendo que el error 500 es el único pendiente).', priority: 'ALTA', status: 'En Desarrollo', type: 'Feature' },
+                { id: 'E3 (Feature)', title: 'Poder listar viajes con al menos 3 filtros', detail: 'Listado de viajes con filtros.', priority: 'ALTA', status: 'En Desarrollo', type: 'Feature' },
+                { id: 'E3 (Feature)', title: 'Ver detalle de cada viaje', detail: 'Desde la lista, poder entrar a ver el detalle de cada viaje.', priority: 'ALTA', status: 'En Desarrollo', type: 'Feature' },
+                { id: 'E5 (Pendiente)', title: 'Búsqueda de Texto Completo', detail: 'El sitio debe permitir búsqueda de texto completo sobre el contenido del sitio (ej: buscar por descripción o comentarios).', priority: 'BAJA', status: 'Pendiente', type: 'Idea' },
+                { id: 'E5 (Idea 1)', title: 'Sistema de Rating y Reseñas', detail: 'Los conductores y pasajeros pueden calificarse mutuamente al finalizar un viaje.', priority: 'BAJA', status: 'Pendiente', type: 'Idea' },
+                { id: 'E5 (Idea 2)', title: 'Historial de Viajes Detallado', detail: 'Sección para que cada usuario pueda ver un historial completo de sus viajes realizados y pendientes.', priority: 'BAJA', status: 'Pendiente', type: 'Idea' },
+            ];
+
+            const priorityFilter = document.getElementById('priority-filter');
+            const statusFilter = document.getElementById('status-filter');
+            const taskListContainer = document.getElementById('task-list');
+
+            const priorityColors = {
+                'CRÍTICA': { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-500' },
+                'ALTA': { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-500' },
+                'MEDIA': { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-500' },
+                'BAJA': { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-500' },
+                'PENDIENTE': { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-500' }
+            };
+
+            const chartColors = {
+                'CRÍTICA': 'rgba(239, 68, 68, 0.8)',
+                'ALTA': 'rgba(249, 115, 22, 0.8)',
+                'MEDIA': 'rgba(234, 179, 8, 0.8)',
+                'BAJA': 'rgba(59, 130, 246, 0.8)',
+                'PENDIENTE': 'rgba(107, 114, 128, 0.8)'
+            };
+            
+            const typeChartColors = {
+                'Bug': 'rgba(239, 68, 68, 0.7)',
+                'Feature': 'rgba(59, 130, 246, 0.7)',
+                'Mejora': 'rgba(16, 185, 129, 0.7)',
+                'Idea': 'rgba(168, 85, 247, 0.7)'
+            };
+            
+            const ctxPriority = document.getElementById('priorityChart').getContext('2d');
+            const priorityChart = new Chart(ctxPriority, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [],
+                        borderColor: 'rgba(255, 255, 255, 0.8)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += context.parsed;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            const ctxType = document.getElementById('typeChart').getContext('2d');
+            const typeChart = new Chart(ctxType, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Cantidad de Tareas',
+                        data: [],
+                        backgroundColor: [],
+                        borderColor: [],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+
+            function renderTasks(filteredTasks) {
+                taskListContainer.innerHTML = '';
+                if(filteredTasks.length === 0) {
+                    taskListContainer.innerHTML = `<p class="text-center text-gray-500 py-4">No se encontraron tareas con los filtros seleccionados.</p>`;
+                }
+
+                // URL base para Google Sheets (URL REAL proporcionada por el usuario)
+                // Se utiliza el parámetro 'task_id' para identificar la tarea en la hoja de cálculo.
+                const sheetsBaseUrl = "https://docs.google.com/spreadsheets/d/1TFVvaPfWvEqFdhTG0BZEaQ_n0ZMYuYY5rrxTWgEU_Rg/edit?gid=0#gid=0";
+                
+                filteredTasks.forEach(task => {
+                    const colors = priorityColors[task.priority] || priorityColors['PENDIENTE'];
+                    
+                    // Construir el link con el ID de la tarea
+                    const noteLinkUrl = `${sheetsBaseUrl}&task_id=${encodeURIComponent(task.id)}`;
+
+                    const taskElement = `
+                        <div class="border-l-4 ${colors.border} ${colors.bg} p-4 rounded-r-lg shadow-sm">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="text-sm font-semibold ${colors.text}">${task.id}</span>
+                                    <h4 class="font-bold text-lg">${task.title}</h4>
+                                </div>
+                                <span class="px-3 py-1 text-sm font-semibold rounded-full ${colors.bg} ${colors.text}">${task.priority}</span>
+                            </div>
+                            <p class="mt-2 text-gray-600">${task.detail}</p>
+                            <div class="mt-3 pt-3 border-t border-gray-300 flex justify-end">
+                                <a href="${noteLinkUrl}" target="_blank" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 transition duration-150 ease-in-out bg-indigo-50 px-3 py-1 rounded-md shadow-sm hover:shadow-md flex items-center">
+                                    <span class="mr-1">&#9998;</span>
+                                    Agregar/Ver Notas
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                    taskListContainer.innerHTML += taskElement;
+                });
+            }
+
+            function updateDashboard() {
+                const priority = priorityFilter.value;
+                const status = statusFilter.value;
+
+                const filteredTasks = tasks.filter(task => {
+                    const priorityMatch = priority === 'all' || task.priority === priority;
+                    const statusMatch = status === 'all' || task.status === status;
+                    return priorityMatch && statusMatch;
+                });
+
+                renderTasks(filteredTasks);
+                updateKPIs(filteredTasks);
+                updateCharts(filteredTasks);
+            }
+
+            function updateKPIs(filteredTasks) {
+                document.getElementById('total-tasks').textContent = filteredTasks.length;
+                document.getElementById('critical-tasks').textContent = tasks.filter(t => t.priority === 'CRÍTICA').length;
+                document.getElementById('developing-tasks').textContent = tasks.filter(t => t.status === 'En Desarrollo').length;
+                document.getElementById('pending-tasks').textContent = tasks.filter(t => t.status === 'Pendiente').length;
+            }
+
+            function updateCharts(filteredTasks) {
+                const priorityCounts = {};
+                filteredTasks.forEach(task => {
+                    priorityCounts[task.priority] = (priorityCounts[task.priority] || 0) + 1;
+                });
+                
+                const priorityLabels = Object.keys(priorityCounts);
+                priorityChart.data.labels = priorityLabels;
+                priorityChart.data.datasets[0].data = Object.values(priorityCounts);
+                priorityChart.data.datasets[0].backgroundColor = priorityLabels.map(label => chartColors[label]);
+                priorityChart.update();
+
+                const typeCounts = {};
+                filteredTasks.forEach(task => {
+                    typeCounts[task.type] = (typeCounts[task.type] || 0) + 1;
+                });
+                const typeLabels = Object.keys(typeCounts);
+                typeChart.data.labels = typeLabels;
+                typeChart.data.datasets[0].data = Object.values(typeCounts);
+                typeChart.data.datasets[0].backgroundColor = typeLabels.map(label => typeChartColors[label] || 'rgba(156, 163, 175, 0.7)');
+                typeChart.update();
+            }
+
+            priorityFilter.addEventListener('change', updateDashboard);
+            statusFilter.addEventListener('change', updateDashboard);
+            
+            updateDashboard();
+        });
+    </script>
+
+</body>
+</html>
